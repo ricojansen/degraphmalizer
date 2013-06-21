@@ -4,6 +4,7 @@
  */
 package dgm.configuration.groovy;
 
+<<<<<<< HEAD
 import com.tinkerpop.blueprints.Direction;
 import dgm.configuration.PropertyConfig;
 import dgm.configuration.TypeConfig;
@@ -11,10 +12,13 @@ import dgm.configuration.WalkConfig;
 
 import java.util.Map;
 
+=======
+>>>>>>> 05a5280... Empty classes
 /**
  * User: rico
  * Date: 21/06/2013
  */
+<<<<<<< HEAD
 public class GroovyWalkConfig implements WalkConfig {
     @Override
     public Direction direction() {
@@ -35,4 +39,7 @@ public class GroovyWalkConfig implements WalkConfig {
     public String name() {
         return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
+=======
+public class GroovyWalkConfig {
+>>>>>>> 05a5280... Empty classes
 }

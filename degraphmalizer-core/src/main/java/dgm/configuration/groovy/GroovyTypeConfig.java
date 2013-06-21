@@ -4,6 +4,7 @@
  */
 package dgm.configuration.groovy;
 
+<<<<<<< HEAD
 import com.fasterxml.jackson.databind.JsonNode;
 import dgm.Subgraph;
 import dgm.configuration.IndexConfig;
@@ -12,10 +13,13 @@ import dgm.configuration.WalkConfig;
 
 import java.util.Map;
 
+=======
+>>>>>>> 05a5280... Empty classes
 /**
  * User: rico
  * Date: 21/06/2013
  */
+<<<<<<< HEAD
 public class GroovyTypeConfig implements TypeConfig {
     @Override
     public String name() {
@@ -66,4 +70,7 @@ public class GroovyTypeConfig implements TypeConfig {
     public Map<String, WalkConfig> walks() {
         return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
+=======
+public class GroovyTypeConfig {
+>>>>>>> 05a5280... Empty classes
 }
