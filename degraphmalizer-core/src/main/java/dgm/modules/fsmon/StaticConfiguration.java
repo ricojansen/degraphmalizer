@@ -1,28 +1,35 @@
 package dgm.modules.fsmon;
 
-import com.fasterxml.jackson.databind.ObjectMapper;
-import com.google.inject.*;
 import dgm.configuration.Configuration;
 
 import java.io.IOException;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
+import com.google.inject.Provides;
+
 /**
  * Non-reloading javascript configuration
  */
-public class StaticConfiguration extends AbstractConfigurationModule
-{
-    public StaticConfiguration(String scriptFolder, String... libraries)
-    {
+public class StaticConfiguration extends AbstractConfigurationModule {
+    private Configuration configuration;
+
+    public StaticConfiguration(String scriptFolder, String... libraries) {
         super(scriptFolder, libraries);
+        try {
+            configuration = createConfiguration(new ObjectMapper(), scriptFolder, this.libraries);
+        } catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+        //bind(Configuration.class).toProvider(ConfigurationReloader.class);
     }
 
-    @Provides @Singleton @Inject
-    final Configuration provideConfiguration(ObjectMapper om) throws IOException
-	{
-		return createConfiguration(om, scriptFolder, libraries);
-	}
+    @Provides
+    final Configuration provideConfiguration() throws IOException {
+        return configuration;
+    }
 
     @Override
-    protected void configureModule()
-    {}
+    protected void configureModule() {
+
+    }
 }
