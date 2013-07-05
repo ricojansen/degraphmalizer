@@ -9,7 +9,9 @@ import dgm.modules.elasticsearch.ResolvedPathElement;
 import dgm.trees.Tree;
 import dgm.trees.Trees;
 
-import java.io.*;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -30,12 +32,12 @@ import com.tinkerpop.blueprints.Direction;
  * Load configuration from javascript files in a directory
  */
 public class JavascriptConfiguration implements Configuration {
-    public static final String FIXTURES_DIR_NAME = "/fixtures/";
 
     private static final Logger LOG = LoggerFactory.getLogger(JavascriptConfiguration.class);
 
     private final Map<String, JavascriptIndexConfig> indices = new HashMap<String, JavascriptIndexConfig>();
-    private JavascriptFixtureConfiguration fixtureConfig;
+
+    //private JavascriptFixtureConfiguration fixtureConfig;
 
     static {
         ContextFactory.initGlobal(new JavascriptContextFactory());
@@ -54,17 +56,10 @@ public class JavascriptConfiguration implements Configuration {
         }
         for (URL dir : directories) {
             // each subdirectory encodes an index
-            if (dir.getPath().endsWith(FIXTURES_DIR_NAME)) {
-                fixtureConfig = new JavascriptFixtureConfiguration(new File(dir.getFile()));
-                LOG.debug(fixtureConfig.toString());
-            } else {
-                String[] dirArray = dir.getPath().split("/");
-                String dirname = dirArray[dirArray.length -1];
-                indices.put(dirname, new JavascriptIndexConfig(om, dirname, dir, libraries));
-            }
-        }
-        if (fixtureConfig == null) {
-            LOG.warn("No fixtures found in " + directory);
+
+            String[] dirArray = dir.getPath().split("/");
+            String dirname = dirArray[dirArray.length -1];
+            indices.put(dirname, new JavascriptIndexConfig(om, dirname, dir, libraries));
         }
     }
 
@@ -72,11 +67,6 @@ public class JavascriptConfiguration implements Configuration {
     @Override
     public Map<String, ? extends IndexConfig> indices() {
         return indices;
-    }
-
-    @Override
-    public FixtureConfiguration getFixtureConfiguration() {
-        return fixtureConfig;
     }
 
     private static class JavascriptContextFactory extends ContextFactory {
@@ -147,7 +137,7 @@ class JavascriptIndexConfig implements IndexConfig {
                 LOG.info("Found config file [{}] for index [{}]", file, index);
                 final Reader reader = new InputStreamReader(file.openStream(), "UTF-8");
                 final String fn = file.toString();
-                final String type = file.getFile().replaceFirst(".conf.js", "");
+                final String type = file.getFile().replaceFirst(".conf.js", "").replaceFirst(".*/", "");
 
                 final Scriptable typeConfig = (Scriptable) compile(cx, buildScope, reader, fn);
 

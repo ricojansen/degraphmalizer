@@ -19,6 +19,7 @@ import dgm.modules.neo4j.CommonNeo4j;
 import dgm.modules.neo4j.EmbeddedNeo4J;
 
 import java.io.File;
+import java.io.IOException;
 import java.lang.management.ManagementFactory;
 import java.util.ArrayList;
 import java.util.List;
@@ -26,6 +27,7 @@ import java.util.List;
 import javax.management.MBeanServer;
 import javax.management.ObjectName;
 
+import org.apache.commons.lang3.StringUtils;
 import org.nnsoft.guice.sli4j.core.InjectLogger;
 import org.nnsoft.guice.sli4j.slf4j.Slf4jLoggingModule;
 import org.slf4j.Logger;
@@ -41,7 +43,7 @@ public final class Main {
     @InjectLogger
     Logger log;
 
-    private Main(String[] args) {
+    private Main(String[] args) throws IOException {
         final Options opt = new Options();
 
         // parse CLI options
@@ -88,6 +90,9 @@ public final class Main {
         // configuration reloading etc
         setupConfiguration(opt, modules);
 
+        if (StringUtils.isNotEmpty(opt.fixtures)) {
+            modules.add(new FixturesModule(opt.fixtures, opt.development, opt.reloading));
+        }
         // the injector
         final Injector injector = Guice.createInjector(modules);
 
@@ -128,7 +133,7 @@ public final class Main {
         runner.startServices();
 
         // start fixtures
-        if (opt.fixtures) {
+        if (StringUtils.isNotEmpty(opt.fixtures)) {
             FixturesRunner fl = injector.getInstance(FixturesRunner.class);
             try {
                 fl.runFixtures();
@@ -164,21 +169,16 @@ public final class Main {
         modules.add(new NodeES(cluster, bindhost, host, port));
     }
 
-    private void setupConfiguration(Options opt, List<Module> modules) {
+    private void setupConfiguration(Options opt,  List<Module> modules) throws IOException {
         // automatic reloading
         if (opt.reloading) {
             modules.add(new DynamicConfiguration(opt.config, opt.libraries()));
         } else {
             modules.add(new StaticConfiguration(opt.config, opt.libraries()));
         }
-
-        // fixtures
-        if (opt.fixtures) {
-            modules.add(new FixturesModule(createRunMode(opt)));
-        }
     }
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws IOException {
         new Main(args);
     }
 
@@ -187,12 +187,4 @@ public final class Main {
         System.exit(1);
     }
 
-    private static RunMode createRunMode(Options options) {
-        if (options.development && options.reloading && options.fixtures) {
-            return RunMode.DEVELOPMENT;
-        } else if (options.reloading && options.fixtures) {
-            return RunMode.TEST;
-        }
-        return RunMode.PRODUCTION;
-    }
 }
