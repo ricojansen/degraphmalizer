@@ -18,6 +18,7 @@ import dgm.modules.bindingannotations.Recomputes;
 import dgm.modules.elasticsearch.QueryFunction;
 import dgm.trees.Pair;
 import dgm.trees.Tree;
+import dgm.trees.TreeEntry;
 import dgm.trees.Trees;
 
 import java.io.IOException;
@@ -156,6 +157,7 @@ public class Degraphmalizer implements Degraphmalizr {
         };
     }
 
+    // TODO: how about implementing equals() of RecomputeRequest and simply using rs.contains()?
     private boolean inList(RecomputeRequest r, List<RecomputeRequest> rs) {
         for (RecomputeRequest q : rs) {
             final boolean equalId = q.root.id().equals(r.root.id());
@@ -231,9 +233,11 @@ public class Degraphmalizer implements Degraphmalizr {
             final List<RecomputeRequest> post = determineRecomputeActions(action);
 
             // add all the missing requests from pre to post
-            for (RecomputeRequest r : pre)
-                if (!inList(r, post))
+            for (RecomputeRequest r : pre) {
+                if (!inList(r, post)) {
                     post.add(r);
+                }
+            }
 
             logRecomputes(action.id(), post);
             return recomputeAffectedDocuments(post);
@@ -342,7 +346,7 @@ public class Degraphmalizer implements Degraphmalizr {
         }
 
         // TODO: shouldn't this be: resp.version() > id.version()
-        log.debug("Request has version " + id.version() + " and current es document has version " + resp.version());
+        log.debug("Request has version {} and current es document has version {}", id.version(),  resp.version());
         if (resp.version() != id.version()) {
             throw new ExpiredException(id.version(resp.version()));
         }
@@ -359,7 +363,7 @@ public class Degraphmalizer implements Degraphmalizr {
                 sgs.add(sg);
             }
 
-            if (log.isDebugEnabled()) {
+            if (log.isDebugEnabled() && sg != null) {
                 final int edges = Iterables.size(sg.edges());
                 log.debug("Computing subgraph for /{}/{}, containing {} edges",
                     new Object[]{c.targetIndex(), c.targetType(), edges});
@@ -381,29 +385,32 @@ public class Degraphmalizer implements Degraphmalizr {
         // create Callable from the actions
         // TODO call 'recompute started' for each action to update the status
         final ArrayList<Callable<RecomputeResult>> jobs = new ArrayList<Callable<RecomputeResult>>();
-        for (RecomputeRequest r : recomputeRequests)
+        for (RecomputeRequest r : recomputeRequests) {
             jobs.add(recomputeDocument(r));
+        }
 
         // recompute all affected documents and wait for results
         // TODO call 'recompute finished' for each action
         return recomputeQueue.invokeAll(jobs);
     }
 
-    private ArrayList<RecomputeRequest> determineRecomputeActions(DegraphmalizeRequest action) {
+    private List<RecomputeRequest> determineRecomputeActions(DegraphmalizeRequest action) {
         final ID id = action.id();
 
         // we now start traversals for each walk to find documents affected by this change
         final Vertex root = GraphUtilities.findVertex(objectMapper, graph, id);
-        if (root == null)
+        if (root == null) {
             // TODO this shouldn't occur, because the subgraph implicitly commits a vertex to the graph
             throw new NotFoundInGraphException(id);
+        }
 
-        final ArrayList<RecomputeRequest> recomputeRequests = new ArrayList<RecomputeRequest>();
+        final List<RecomputeRequest> recomputeRequests = new ArrayList<RecomputeRequest>();
 
         // we add ourselves (for each config) as the first job(s) in the list
         final VID vid = new VID(objectMapper, root);
-        for (TypeConfig c : action.configs())
-            recomputeRequests.add(new RecomputeRequest(vid, c));
+        for (TypeConfig c : action.configs()) {
+            recomputeRequests.add(new RecomputeRequest(vid, c, 0));
+        }
 
         // traverse graph in both direction, starting at the root
         log.debug("Computing tree in direction IN, starting at {}", root);
@@ -419,28 +426,39 @@ public class Degraphmalizer implements Degraphmalizr {
         }
 
         // create "dirty document" messages for each node in the tree
-        for (Pair<Edge, Vertex> pathElement : Iterables.concat(Trees.bfsWalk(up), Trees.bfsWalk(down))) {
-            final Vertex v = pathElement.b;
-
-            // skip the root of the tree, ie. ourselves:
-            if (v.equals(root)) {
-                continue;
-            }
-
-            final VID v_id = new VID(objectMapper, v);
-
-            // we already know this document does not exist in ES, skip
-            if (v_id.id().version() == 0) {
-                continue;
-            }
-
-            // alright, mark for computation
-            for (TypeConfig c : Configurations.configsFor(cfgProvider.get(), v_id.id().index(), v_id.id().type())) {
-                recomputeRequests.add(new RecomputeRequest(v_id, c));
-            }
+        for (TreeEntry<Pair<Edge, Vertex>> pathElement : Iterables.concat(Trees.bfsWalk(up), Trees.bfsWalk(down))) {
+            addRecomputeRequests(recomputeRequests, pathElement.getValue(), pathElement.getDistance());
         }
 
         return recomputeRequests;
+    }
+
+    protected void addRecomputeRequests(List<RecomputeRequest> recomputeRequests, Pair<Edge, Vertex> pathElement, int distance) {
+
+        // skip the root of the tree, ie. ourselves:
+        if (distance == 0) {
+            return;
+        }
+
+        final Vertex v = pathElement.b;
+
+
+        final VID v_id = new VID(objectMapper, v);
+
+        // we already know this document does not exist in ES, skip
+        if (v_id.id().version() == 0) {
+            return;
+        }
+
+        // alright, mark for computation
+        for (TypeConfig c : Configurations.configsFor(cfgProvider.get(), v_id.id().index(), v_id.id().type())) {
+            if (distance <= c.maximalWalkDepth()) {
+                recomputeRequests.add(new RecomputeRequest(v_id, c, distance));
+            } else {
+                log.debug("Ignoring recompute request for {} because {} has maximal distance smaller than {}", new Object[] {v_id, c, distance});
+            }
+        }
+
     }
 
     /**

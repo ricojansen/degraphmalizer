@@ -15,6 +15,7 @@ import java.io.Reader;
 import java.net.URL;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.mozilla.javascript.*;
@@ -45,20 +46,16 @@ public class JavascriptConfiguration implements Configuration {
 
     public JavascriptConfiguration(ObjectMapper om, String directory, URL... libraries) throws IOException {
         LOG.info("Reading {} with libraries {}", directory, Arrays.asList(libraries));
-        URL url = getClass().getClassLoader().getResource(directory);
-        if (url == null) {
-            url = new URL(directory);
-        }
-
-        final URL[] directories = Configurations.list(url, Configurations.IS_DIRECTORY);
+        final List<String> directories = Configurations.listDirectories(directory);
         if (directories == null) {
             throw new ConfigurationException("Configuration directory " + directory + " does not exist");
         }
-        for (URL dir : directories) {
+        for (String dir : directories) {
             // each subdirectory encodes an index
-
-            String[] dirArray = dir.getPath().split("/");
+            String[] dirArray = dir.split("/");
             String dirname = dirArray[dirArray.length -1];
+            LOG.info("Reading {} ({})", dir, dirname);
+
             indices.put(dirname, new JavascriptIndexConfig(om, dirname, dir, libraries));
         }
     }
@@ -100,7 +97,7 @@ class JavascriptIndexConfig implements IndexConfig {
      * @param index     The elastic search index to write to
      * @param directory Directory to watch for files
      */
-    public JavascriptIndexConfig(ObjectMapper om, String index, URL directory, URL... libraries) throws IOException {
+    public JavascriptIndexConfig(ObjectMapper om, String index, String directory, URL... libraries) throws IOException {
 
         LOG.info("ES: {}, directory: {}, libraries {}", new Object[]{index, directory, Arrays.asList(libraries)});
         this.index = index;
@@ -128,16 +125,17 @@ class JavascriptIndexConfig implements IndexConfig {
                 }
             };
 
-            final URL[] configFiles = Configurations.list(directory, filenameFilter);
+            final List<URL> configFiles = Configurations.list(directory, filenameFilter);
             if (configFiles == null) {
                 throw new ConfigurationException("Configuration directory " + directory + " can not be read");
             }
-            LOG.info("{}: Found config files  for index [{}]", directory, Arrays.asList(configFiles));
+            LOG.info("{}: Found config files  for index [{}]", directory, configFiles);
             for (URL file : configFiles) {
-                LOG.info("Found config file [{}] for index [{}]", file, index);
                 final Reader reader = new InputStreamReader(file.openStream(), "UTF-8");
                 final String fn = file.toString();
                 final String type = file.getFile().replaceFirst(".conf.js", "").replaceFirst(".*/", "");
+
+                LOG.info("Found config file [{}] for index [{}] and type [{}]", new Object[] {file, index, type});
 
                 final Scriptable typeConfig = (Scriptable) compile(cx, buildScope, reader, fn);
 
@@ -205,6 +203,7 @@ class JavascriptTypeConfig implements TypeConfig {
 
     final ObjectMapper objectMapper;
 
+
     final Map<String, WalkConfig> walks = new HashMap<String, WalkConfig>();
 
     public JavascriptTypeConfig(ObjectMapper objectMapper, String type, Scriptable scope, Scriptable script, IndexConfig indexConfig) throws IOException {
@@ -228,6 +227,7 @@ class JavascriptTypeConfig implements TypeConfig {
             sourceIndex = ScriptableObject.getTypedProperty(script, "sourceIndex", String.class);
             sourceType = ScriptableObject.getTypedProperty(script, "sourceType", String.class);
 
+
             // add the walks
             final Scriptable walks = (Scriptable) fetchObjectOrNull("walks");
             if (walks != null) {
@@ -239,9 +239,13 @@ class JavascriptTypeConfig implements TypeConfig {
 
                     final Direction direction = Direction.valueOf(ScriptableObject.getProperty(walk, "direction").toString());
 
+                    Integer  maxDistance = ScriptableObject.getTypedProperty(walk, "maxDistance", Integer.class);
+                    if (maxDistance == null) maxDistance = Integer.MAX_VALUE;
+
+
                     final Scriptable properties = (Scriptable) ScriptableObject.getProperty(walk, "properties");
 
-                    final JavascriptWalkConfig walkCfg = new JavascriptWalkConfig(objectMapper, walkName, direction, this, scope, properties);
+                    final JavascriptWalkConfig walkCfg = new JavascriptWalkConfig(objectMapper, walkName, direction, maxDistance, this, scope, properties);
 
                     this.walks.put(walkName, walkCfg);
                 }
@@ -374,6 +378,23 @@ class JavascriptTypeConfig implements TypeConfig {
     public Map<String, WalkConfig> walks() {
         return walks;
     }
+
+    @Override
+    public Integer maximalWalkDepth() {
+        int result = 0;
+        for (WalkConfig walkConfig : walks().values()) {
+            if (walkConfig.maxDistance() > result) {
+                result = walkConfig.maxDistance();
+            }
+        }
+        return result;
+    }
+
+
+    @Override
+    public String toString() {
+        return getClass().getName() + ' ' + sourceIndex() + '/' + sourceType() + "->" + targetIndex() + '/' + targetType() + "(" + maximalWalkDepth() + ")";
+    }
 }
 
 class JavascriptWalkConfig implements WalkConfig {
@@ -381,14 +402,18 @@ class JavascriptWalkConfig implements WalkConfig {
     final Direction direction;
     final TypeConfig typeCfg;
 
+    final Integer maxDistance;
+
     // TODO use guava immutables
     final Map<String, JavascriptPropertyConfig> properties = new HashMap<String, JavascriptPropertyConfig>();
 
 
-    public JavascriptWalkConfig(ObjectMapper om, String walkName, Direction direction, TypeConfig typeCfg, Scriptable scope, Scriptable propertyScriptable) {
+    public JavascriptWalkConfig(ObjectMapper om, String walkName, Direction direction, Integer maxDistance, TypeConfig typeCfg, Scriptable scope, Scriptable propertyScriptable) {
         this.walkName = walkName;
         this.direction = direction;
+        this.maxDistance = maxDistance;
         this.typeCfg = typeCfg;
+
 
         try {
             Context.enter();
@@ -426,6 +451,11 @@ class JavascriptWalkConfig implements WalkConfig {
     @Override
     public String name() {
         return walkName;
+    }
+
+    @Override
+    public Integer maxDistance() {
+        return maxDistance;
     }
 }
 
