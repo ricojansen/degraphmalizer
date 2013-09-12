@@ -4,19 +4,15 @@
  */
 package dgm.configuration.groovy;
 
-<<<<<<< HEAD
 import dgm.configuration.FixtureConfiguration;
 import dgm.configuration.FixtureIndexConfiguration;
 
 import java.io.File;
 
-=======
->>>>>>> 05a5280... Empty classes
 /**
  * User: rico
  * Date: 21/06/2013
  */
-<<<<<<< HEAD
 public class GroovyFixtureConfiguration implements FixtureConfiguration {
     @Override
     public Iterable<String> getIndexNames() {
@@ -42,7 +38,4 @@ public class GroovyFixtureConfiguration implements FixtureConfiguration {
     public File getResultsDirectory() {
         return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
-=======
-public class GroovyFixtureConfiguration {
->>>>>>> 05a5280... Empty classes
 }

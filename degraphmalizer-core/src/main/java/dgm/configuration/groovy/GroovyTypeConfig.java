@@ -4,31 +4,51 @@
  */
 package dgm.configuration.groovy;
 
-<<<<<<< HEAD
 import com.fasterxml.jackson.databind.JsonNode;
 import dgm.Subgraph;
 import dgm.configuration.IndexConfig;
 import dgm.configuration.TypeConfig;
 import dgm.configuration.WalkConfig;
+import groovy.lang.MetaClass;
+import groovy.lang.MetaMethod;
+import groovy.lang.Script;
 
+import java.util.List;
 import java.util.Map;
 
-=======
->>>>>>> 05a5280... Empty classes
 /**
  * User: rico
  * Date: 21/06/2013
  */
-<<<<<<< HEAD
 public class GroovyTypeConfig implements TypeConfig {
+    String name;
+    IndexConfig config;
+    Script script;
+
+    final String sourceIndex;
+    final String sourceType;
+
+    public GroovyTypeConfig(String name, IndexConfig config, Script script) {
+        this.name = name;
+        this.config = config;
+        this.script = script;
+        MetaClass metaClass = script.getMetaClass();
+        List<MetaMethod> methods = metaClass.getMethods();
+        // TODO check if all methods required are present in this script.
+        sourceIndex = (String) script.getProperty("sourceIndex");
+        sourceType = (String) script.getProperty("sourceType");
+    }
+
     @Override
     public String name() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return name;
     }
 
     @Override
     public Subgraph extract(JsonNode document) {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        Subgraph subgraph = null;
+        script.invokeMethod("extract", new Object[]{document, subgraph});
+        return subgraph;
     }
 
     @Override
@@ -43,34 +63,43 @@ public class GroovyTypeConfig implements TypeConfig {
 
     @Override
     public IndexConfig index() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return config;
     }
 
     @Override
     public String targetIndex() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return config.name();
     }
 
     @Override
     public String targetType() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return name();
     }
 
     @Override
     public String sourceIndex() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return sourceIndex;
     }
 
     @Override
     public String sourceType() {
-        return null;  //To change body of implemented methods use File | Settings | File Templates.
+        return sourceType;
     }
 
     @Override
     public Map<String, WalkConfig> walks() {
         return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
-=======
-public class GroovyTypeConfig {
->>>>>>> 05a5280... Empty classes
+
+    @Override
+    public Integer maximalWalkDepth() {
+        int result = 0;
+        for (WalkConfig walkConfig : walks().values()) {
+            if (walkConfig.maxDistance() > result) {
+                result = walkConfig.maxDistance();
+            }
+        }
+        return result;
+    }
+
 }

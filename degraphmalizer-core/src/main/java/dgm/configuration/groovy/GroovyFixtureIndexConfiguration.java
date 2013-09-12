@@ -4,17 +4,15 @@
  */
 package dgm.configuration.groovy;
 
-<<<<<<< HEAD
 import dgm.configuration.FixtureIndexConfiguration;
 import dgm.configuration.FixtureTypeConfiguration;
+import org.elasticsearch.common.settings.Settings;
 
-=======
->>>>>>> 05a5280... Empty classes
+
 /**
  * User: rico
  * Date: 21/06/2013
  */
-<<<<<<< HEAD
 public class GroovyFixtureIndexConfiguration implements FixtureIndexConfiguration {
     @Override
     public Iterable<String> getTypeNames() {
@@ -30,7 +28,9 @@ public class GroovyFixtureIndexConfiguration implements FixtureIndexConfiguratio
     public Iterable<FixtureTypeConfiguration> getTypeConfigurations() {
         return null;  //To change body of implemented methods use File | Settings | File Templates.
     }
-=======
-public class GroovyFixtureIndexConfiguration {
->>>>>>> 05a5280... Empty classes
+
+    @Override
+    public Settings getSettingsConfig() {
+        return null;  //To change body of implemented methods use File | Settings | File Templates.
+    }
 }
